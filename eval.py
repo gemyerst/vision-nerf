@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 import torchvision.transforms as T
+from PIL import Image
 
 from models.render_image import render_single_image
 from models.model import VisionNerfModel
@@ -147,10 +148,8 @@ class SRNRenderDataset(Dataset):
         self.base_path = args.data_path
         self.dataset_name = os.path.basename(args.data_path)
 
-        print("Loading SRN dataset", self.base_path, "name:", self.dataset_name)
+        print("Loading ARCHI dataset", self.base_path, "name:", self.dataset_name)
         assert os.path.exists(self.base_path)
-
-        is_chair = "chair" in self.dataset_name
 
         intrinsic_paths = sorted(
             glob.glob(os.path.join(self.base_path, "*", "intrinsics.txt"))
@@ -161,12 +160,12 @@ class SRNRenderDataset(Dataset):
         self.rgb_paths = []
         for path in tqdm.tqdm(intrinsic_paths):
             dir = os.path.dirname(path)
-            curr_paths = sorted(glob.glob(os.path.join(dir, "rgb", "*")))
-            self.rgb_paths.append(curr_paths)
+            curr_paths = sorted(glob.glob(os.path.join(dir, "pose", "*")))
+            img_paths = sorted(glob.glob(os.path.join(dir, "*.png")))
+            self.rgb_paths.append(img_paths)
 
-            pose_paths = [f.replace('rgb', 'pose').replace('png', 'txt') for f in curr_paths]
-            c2w_mats = [parse_pose(x) for x in 
-                    pose_paths]
+            #pose_paths = [f.replace('rgb', 'pose').replace('png', 'txt') for f in curr_paths]
+            c2w_mats = [parse_pose(x) for x in curr_paths]
             self.poses.append(c2w_mats)
 
             self.intrinsics.append(parse_intrinsic(path))
@@ -181,12 +180,9 @@ class SRNRenderDataset(Dataset):
         self.img_hw = args.img_hw
 
         # default near/far plane depth
-        if is_chair:
-            self.z_near = 1.25
-            self.z_far = 2.75
-        else:
-            self.z_near = 0.8
-            self.z_far = 1.8
+
+        self.z_near = 0.8
+        self.z_far = 1.8
 
     def __len__(self):
         return len(self.intrinsics)
@@ -274,6 +270,23 @@ def pose_spherical(theta, phi, radius):
 
     return c2w
 
+def make_transparent_png(img_in):
+    img = Image.open(img_in)
+    img = img.convert("RGBA")
+
+    datas = img.getdata()
+
+    newData = []
+
+    for item in datas:
+        if item[0] == 255 and item[1] == 255 and item[2] == 255:
+            newData.append((255, 255, 255, 0))
+        else:
+            newData.append(item)
+
+    img.putdata(newData)
+    return img
+
 def gen_eval(args):
 
     device = "cuda"
@@ -335,6 +348,7 @@ def gen_eval(args):
         view_indices = np.arange(0, len(render_poses), args.skip)
         render_poses = render_poses[view_indices]
 
+        imgs = []
         with torch.no_grad():
 
             for idx, pose in tqdm.tqdm(zip(view_indices, render_poses), total=len(view_indices)):
@@ -367,8 +381,13 @@ def gen_eval(args):
                 rgb_im = rgb_im.permute([1, 2, 0]).cpu().numpy()
 
                 rgb_im = (rgb_im * 255.).astype(np.uint8)
+                #transparent_rgb = make_transparent_png(rgb_im)
                 imageio.imwrite(filename, rgb_im)
+                imgs.append(rgb_im)
                 torch.cuda.empty_cache()
+
+            imgs = np.stack(imgs, 0)
+            imageio.mimsave(os.path.join(out_folder, f'output.gif'), imgs, fps=12)
 
 if __name__ == '__main__':
     parser = config_parser()

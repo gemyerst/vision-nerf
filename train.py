@@ -111,7 +111,7 @@ def train(args):
     val_subset = torch.utils.data.Subset(val_dataset, val_indices)
     val_loader = DataLoader(val_subset, batch_size=1, shuffle=False)
 
-    # Create model
+    # Create model try FALSE GINA
     model = VisionNerfModel(args, load_opt=not args.no_load_opt, load_scheduler=not args.no_load_scheduler)
     # Create projector
     projector = Projector(device=device)
