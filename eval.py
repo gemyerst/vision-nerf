@@ -271,21 +271,21 @@ def pose_spherical(theta, phi, radius):
     return c2w
 
 def make_transparent_png(img_in):
-    img = Image.open(img_in)
-    img = img.convert("RGBA")
+    img = Image.fromarray(img_in)
+    img_rgba = img.convert("RGBA")
+    pixel_data = img_rgba.getdata()
+    white_px = 235
 
-    datas = img.getdata()
+    new_data = []
 
-    newData = []
-
-    for item in datas:
-        if item[0] == 255 and item[1] == 255 and item[2] == 255:
-            newData.append((255, 255, 255, 0))
+    for data in pixel_data:
+        if data[0] >= white_px and data[1] >= white_px and data[2] >= white_px:
+            new_data.append((255, 255, 255, 0))
         else:
-            newData.append(item)
+            new_data.append(data)
 
-    img.putdata(newData)
-    return img
+    img_rgba.putdata(new_data)
+    return img_rgba
 
 def gen_eval(args):
 
@@ -381,8 +381,8 @@ def gen_eval(args):
                 rgb_im = rgb_im.permute([1, 2, 0]).cpu().numpy()
 
                 rgb_im = (rgb_im * 255.).astype(np.uint8)
-                #transparent_rgb = make_transparent_png(rgb_im)
-                imageio.imwrite(filename, rgb_im)
+                transparent_rgb = make_transparent_png(rgb_im)
+                imageio.imwrite(filename, transparent_rgb)
                 imgs.append(rgb_im)
                 torch.cuda.empty_cache()
 
