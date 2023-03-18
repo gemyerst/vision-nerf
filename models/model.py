@@ -91,7 +91,7 @@ class VisionNerfModel(object):
                     output_device=args.local_rank
                 )
 
-    def encode(self, x):
+    def encode(self, x): #forward prop
         """
         Args:
             x: input tensor [b, v, h, w, c]

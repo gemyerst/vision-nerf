@@ -16,6 +16,7 @@
 from collections import OrderedDict
 import torch
 import torch.nn.functional as F
+from models.model import VisionNerfModel 
 from einops import rearrange, repeat
 
 ########################################################################################################################
@@ -176,7 +177,7 @@ def raw2outputs(raw, z_vals, white_bkgd=False):
 
 
 def render_rays(ray_batch,
-                model,
+                model: VisionNerfModel,
                 featmaps,
                 projector,
                 N_samples,

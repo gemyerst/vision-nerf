@@ -205,8 +205,7 @@ def train(args):
                     fpath = os.path.join(out_folder, 'model_{:06d}.pth'.format(global_step))
                     model.save_model(fpath)
 
-                if global_step % args.i_plot == 0:
-                    # plot loss
+                if global_step % args.i_plot == 0: # plot loss
                     plt.plot(loss_record)
                     plt.savefig(log_folder + "/loss" + str(global_step) + ".png")
                     plt.show()
