@@ -22,6 +22,7 @@ import shutil
 import torch
 import torch.utils.data.distributed
 import torch.distributed as dist
+import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
 
@@ -126,6 +127,7 @@ def train(args):
 
     global_step = model.start_step + 1
     epoch = 0
+    loss_record = []
     while global_step < model.start_step + args.n_iters + 1:
         np.random.seed()
         for train_data in train_loader:
@@ -165,6 +167,9 @@ def train(args):
 
             loss.backward()
             scalars_to_log['loss'] = loss.item()
+
+            loss_record.append(loss)
+
             model.optimizer.step()
             if args.use_warmup and global_step < args.warmup_steps:
                 model.warmup_scheduler.step()
@@ -199,6 +204,12 @@ def train(args):
                     print('Saving checkpoints at {} to {}...'.format(global_step, out_folder))
                     fpath = os.path.join(out_folder, 'model_{:06d}.pth'.format(global_step))
                     model.save_model(fpath)
+
+                if global_step % args.i_plot == 0:
+                    # plot loss
+                    plt.plot(loss_record)
+                    plt.savefig(log_folder + "/loss" + str(global_step) + ".png")
+                    plt.show()
 
                 if global_step % args.i_img == 0:
                     model.switch_to_eval()

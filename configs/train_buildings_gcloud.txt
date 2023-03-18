@@ -1,0 +1,32 @@
+#sudo su -
+#mkdir ...
+#gcloud storage cp gs://BUCKET_NAME/OBJECT_NAME SAVE_TO_LOCATION
+
+expname = building_test1
+logdir =  /home/G/vision-nerf/results/training
+ckptdir =  /home/G/vision-nerf/weights
+ckpt_path =  /home/G/vision-nerf/weights/srn_archi_500000.pth
+data_path = /home/G/vision-nerf/dataset/vision-nerf-buildings-1/buildings
+img_hw = [128, 128]
+N_rand = 512
+batch_size = 1
+chunk_size = 512
+# Change batch_size and chunk_size if you have beefy machines
+# batch_size = 2
+# chunk_size = 1024
+mlp_block_num = 6
+im_feat_dim = 512
+lrate_feature = 1e-5
+lrate_mlp = 1e-4
+scheduler = steplr
+sample_mode = bbox_sample_full
+bbox_steps = 5000
+use_warmup = True
+warmup_steps = 1000
+lrate_decay_factor = 0.1
+lrate_decay_steps = 4500
+n_iters = 5000
+distributed = False
+white_bkgd = True
+freeze_pos_embed = False
+no_skip_conv = False

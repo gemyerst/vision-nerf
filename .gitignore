@@ -1,2 +1,10 @@
 __pycache__/
 *.pyc
+.idea/.gitignore
+.gitignore
+*.png
+*.gif
+*config.txt
+*args.txt
+*.zip
+*events

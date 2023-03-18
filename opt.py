@@ -57,17 +57,17 @@ def config_parser():
                         help='do not load scheduler when reloading')
 
     ########### iterations & learning rate options ##########
-    parser.add_argument('--n_iters', type=int, default=500000, help='num of iterations')
+    parser.add_argument('--n_iters', type=int, default=50000, help='num of iterations')
     parser.add_argument('--lrate_feature', type=float, default=1e-3, help='learning rate for feature extractor')
     parser.add_argument('--lrate_mlp', type=float, default=5e-4, help='learning rate for mlp')
     parser.add_argument('--lrate_decay_factor', type=float, default=0.5,
                         help='decay learning rate by a factor every specified number of steps')
     parser.add_argument('--lrate_decay_steps', type=int, default=50000,
                         help='decay learning rate by a factor every specified number of steps')
-    parser.add_argument('--warmup_steps', type=int, default=10000, help='num of iterations for warm-up')
+    parser.add_argument('--warmup_steps', type=int, default=1000, help='num of iterations for warm-up')
     parser.add_argument('--scheduler', type=str, default='steplr', help='scheduler type to use [steplr]')
     parser.add_argument('--use_warmup', action='store_true', help='use warm-up scheduler')
-    parser.add_argument('--bbox_steps', type=int, default=100000, help='iterations to use bbox sampling')
+    parser.add_argument('--bbox_steps', type=int, default=10000, help='iterations to use bbox sampling')
 
     ########## rendering options ##########
     parser.add_argument('--N_samples', type=int, default=64, help='number of coarse samples per ray')
@@ -82,15 +82,17 @@ def config_parser():
 
     ########## logging/saving options ##########
     parser.add_argument('--i_print', type=int, default=100, help='frequency of terminal printout')
-    parser.add_argument('--i_img', type=int, default=1000, help='frequency of tensorboard image logging')
+    parser.add_argument('--i_img', type=int, default=500, help='frequency of tensorboard image logging')
     parser.add_argument('--i_weights', type=int, default=25000, help='frequency of weight ckpt saving')
-    parser.add_argument('--train_indices', type=int, nargs='+', default=[0, 100, 200],
+    parser.add_argument('--train_indices', type=int, nargs='+', default=[0, 75, 100],
                         help='indices for visualization of training data')
+    parser.add_argument('--i_plot', type=int, default=1000, help='frequency of loss plot')
+
     parser.add_argument('--train_src_views', type=int, nargs='+', default=[0, 0, 0],
                         help='source view indices for visualization of training data')
-    parser.add_argument('--train_tgt_views', type=int, nargs='+', default=[5, 15, 25],
+    parser.add_argument('--train_tgt_views', type=int, nargs='+', default=[5, 10, 14],
                         help='target view indices for visualization of training data')
-    parser.add_argument('--val_indices', type=int, nargs='+', default=[0, 3, 43],
+    parser.add_argument('--val_indices', type=int, nargs='+', default=[5, 10, 14],
                         help='indices for visualization of validation data')
     parser.add_argument('--val_src_views', type=int, nargs='+', default=[64, 64, 64],
                         help='source view indices for visualization of validation data')
