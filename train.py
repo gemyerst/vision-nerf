@@ -168,7 +168,10 @@ def train(args):
             loss.backward()
             scalars_to_log['loss'] = loss.item()
 
-            loss_record.append(loss)
+            w = 500
+            detach_loss = loss.detach().cpu().numpy()
+            moving_average = np.convolve(detach_loss, np.ones(w), 'valid') / w
+            loss_record.append(moving_average)
 
             model.optimizer.step()
             if args.use_warmup and global_step < args.warmup_steps:
