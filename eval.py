@@ -9,8 +9,9 @@ import torch
 from torch.utils.data import Dataset
 import torch.nn.functional as F
 import torchvision.transforms as T
-from PIL import Image
+from PIL import Image, ImageEnhance
 from rembg import remove
+import cv2
 
 from models.render_image import render_single_image
 from models.model import VisionNerfModel
@@ -271,21 +272,138 @@ def pose_spherical(theta, phi, radius):
 
     return c2w
 
+def convertScale(img, alpha, beta):
+    """Add bias and gain to an image with saturation arithmetics. Unlike
+    cv2.convertScaleAbs, it does not take an absolute value, which would lead to
+    nonsensical results (e.g., a pixel at 44 with alpha = 3 and beta = -210
+    becomes 78 with OpenCV, when in fact it should become 0).
+    """
+    new_img = img * alpha + beta
+    new_img[new_img < 0] = 0
+    new_img[new_img > 255] = 255
+    return new_img.astype(np.uint8)
+# Automatic brightness and contrast optimization with optional histogram clipping
+def automatic_brightness_and_contrast(image, clip_hist_percent=25):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # Calculate grayscale histogram
+    hist = cv2.calcHist([gray],[0],None,[256],[0,256])
+    hist_size = len(hist)
+
+    # Calculate cumulative distribution from the histogram
+    accumulator = []
+    accumulator.append(float(hist[0]))
+    for index in range(1, hist_size):
+        accumulator.append(accumulator[index -1] + float(hist[index]))
+
+    # Locate points to clip
+    maximum = accumulator[-1]
+    clip_hist_percent *= (maximum/100.0)
+    clip_hist_percent /= 2.0
+
+    # Locate left cut
+    minimum_gray = 0
+    while accumulator[minimum_gray] < clip_hist_percent:
+        minimum_gray += 1
+
+    # Locate right cut
+    maximum_gray = hist_size -1
+    while accumulator[maximum_gray] >= (maximum - clip_hist_percent):
+        maximum_gray -= 1
+
+    # Calculate alpha and beta values
+    alpha = 255 / (maximum_gray - minimum_gray)
+    beta = -minimum_gray * alpha
+
+    '''
+    # Calculate new histogram with desired range and show histogram 
+    new_hist = cv2.calcHist([gray],[0],None,[256],[minimum_gray,maximum_gray])
+    plt.plot(hist)
+    plt.plot(new_hist)
+    plt.xlim([0,256])
+    plt.show()
+    '''
+
+    auto_result = convertScale(image, alpha=alpha, beta=beta)
+    return auto_result
+
+def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    """Return a sharpened version of the image, using an unsharp mask."""
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+    return sharpened
+
+def remove_background(img_in):
+    # resize image
+    res = cv2.resize(img_in, dsize=(256, 256), interpolation=cv2.INTER_CUBIC)
+    #img = Image.fromarray(res)
+    #enhancer = ImageEnhance.Brightness(img)
+    #enhanced = enhancer.enhance(.8)
+    im = unsharp_mask(res)
+
+    # convert to graky
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    mask = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY)[1]
+    mask = 255 - mask # negate mask
+
+    # apply morphology to remove isolated extraneous noise
+    # use borderconstant of black since foreground touches the edges
+    kernel = np.ones((3, 3), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # anti-alias the mask -- blur then stretch
+    # blur alpha channel
+    mask = cv2.GaussianBlur(mask, (0, 0), sigmaX=2, sigmaY=2, borderType=cv2.BORDER_DEFAULT)
+
+    # linear stretch so that 127.5 goes to 0, but 255 stays 255
+    mask = (2 * (mask.astype(np.float32)) - 255.0).clip(0, 255).astype(np.uint8)
+
+    # put mask into alpha channel
+    result = res.copy()
+    result = cv2.cvtColor(im, cv2.COLOR_BGR2BGRA)
+    result[:, :, 3] = mask
+    transparent_rgb = remove(result)
+    return transparent_rgb
+
+
 def make_transparent_png(img_in):
-    img = Image.fromarray(img_in)
-    img_rgba = img.convert("RGBA")
+    # resize image
+    res = cv2.resize(img_in, dsize=(256, 256), interpolation=cv2.INTER_CUBIC)
+
+    white_pixels = np.where(
+        (res[:, :, 0] > 215) &
+        (res[:, :, 1] > 215) &
+        (res[:, :, 2] > 215)
+    )
+    res[white_pixels] = [255, 255, 255]
+
+    img = Image.fromarray(res)
+    enhancer = ImageEnhance.Brightness(img)
+    enhanced = enhancer.enhance(.85)
+
+    transparent_rgb = remove(enhanced)
+
+    #convert to transparent type
+    img_rgba = transparent_rgb.convert("RGBA")
     pixel_data = img_rgba.getdata()
-    white_px = 235
 
     new_data = []
     for data in pixel_data:
-        if data[0] >= white_px and data[1] >= white_px and data[2] >= white_px:
-            new_data.append((255, 255, 255, 0))
+        if (data[3] >= 30):
+            new_data.append((data[0], data[1], data[2], 255))
         else:
-            new_data.append(data)
+            new_data.append((data[0], data[1], data[2], 0))
 
     img_rgba.putdata(new_data)
     return img_rgba
+
 
 def gen_eval(args):
 
@@ -381,8 +499,8 @@ def gen_eval(args):
                 rgb_im = rgb_im.permute([1, 2, 0]).cpu().numpy()
 
                 rgb_im = (rgb_im * 255.).astype(np.uint8)
-                transparent_rgb = remove(rgb_im)
-                imageio.imwrite(filename, transparent_rgb)
+                cleaned_rbg = make_transparent_png(rgb_im)
+                imageio.imwrite(filename, cleaned_rbg)
                 imgs.append(rgb_im)
                 torch.cuda.empty_cache()
 
