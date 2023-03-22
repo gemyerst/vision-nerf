@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import torch.nn.functional as F
 import torchvision.transforms as T
 from PIL import Image
+from rembg import remove
 
 from models.render_image import render_single_image
 from models.model import VisionNerfModel
@@ -277,7 +278,6 @@ def make_transparent_png(img_in):
     white_px = 235
 
     new_data = []
-
     for data in pixel_data:
         if data[0] >= white_px and data[1] >= white_px and data[2] >= white_px:
             new_data.append((255, 255, 255, 0))
@@ -381,7 +381,7 @@ def gen_eval(args):
                 rgb_im = rgb_im.permute([1, 2, 0]).cpu().numpy()
 
                 rgb_im = (rgb_im * 255.).astype(np.uint8)
-                transparent_rgb = make_transparent_png(rgb_im)
+                transparent_rgb = remove(rgb_im)
                 imageio.imwrite(filename, transparent_rgb)
                 imgs.append(rgb_im)
                 torch.cuda.empty_cache()
