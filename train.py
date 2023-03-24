@@ -157,7 +157,7 @@ def train(args):
                               det=args.det,
                               white_bkgd=args.white_bkgd)
            
-            # compute loss
+            # compute loss 
             model.optimizer.zero_grad()
             loss, scalars_to_log = criterion(ret['outputs_coarse'], ray_batch, scalars_to_log)
 
@@ -168,6 +168,7 @@ def train(args):
             loss.backward()
             scalars_to_log['loss'] = loss.item()
 
+            #own code
             w = 500
             detach_loss = loss.detach().cpu().numpy()
             moving_average = np.convolve(detach_loss, np.ones(w), 'valid') / w
@@ -236,7 +237,7 @@ def train(args):
                                 gt_imgs, output_dicts, len(args.val_tgt_views), prefix=f'val/')
 
                     torch.cuda.empty_cache()
-
+                    
                     print('Logging current training view...')
                     output_dicts = []
                     src_imgs = []

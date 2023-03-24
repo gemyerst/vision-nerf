@@ -1,6 +1,4 @@
-#sudo su -
-#mkdir ...
-#gcloud storage cp gs://BUCKET_NAME/OBJECT_NAME SAVE_TO_LOCATION
+#own script
 
 expname = building_test1
 logdir =  ./results/training
